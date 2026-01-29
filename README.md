@@ -1,21 +1,30 @@
-# bun-react-tailwind-shadcn-template
+# Sendnote (MVP)
 
-To install dependencies:
+A "chat with yourself" note-taking application built with Bun, React, and Supabase.
 
-```bash
-bun install
-```
+## 🚀 Quick Start
 
-To start a development server:
+1.  **Install dependencies:**
+    ```bash
+    bun install
+    ```
+2.  **Environment Setup:**
+    Create a `.env` file in the root:
+    ```env
+    BUN_PUBLIC_SUPABASE_URL=your_supabase_url
+    BUN_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+    ```
+3.  **Run Development Server:**
+    ```bash
+    bun dev
+    ```
 
-```bash
-bun dev
-```
+## 🏗 Architecture
 
-To run for production:
+- **Frontend:** React (Vite/Bun), Tailwind v4, Shadcn UI.
+- **Backend:** Supabase (Auth, Postgres, Storage).
+- **Data Access:** Direct client-side calls via `@supabase/supabase-js`.
 
-```bash
-bun start
-```
+## 🛡️ Error Handling
 
-This project was created using `bun init` in bun v1.3.7. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+This project uses the **Errors as Values** pattern. Async functions return `{ data, error }` objects instead of throwing exceptions.
