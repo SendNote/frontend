@@ -1,10 +1,12 @@
 import { useEffect, useState, useRef, type FormEvent } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { Plus, Hash, LogOut, MoreVertical, Pencil, Trash2, Check, X, User } from "lucide-react";
+import { Plus, Hash, LogOut, MoreVertical, Pencil, Trash2, Check, X, User, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ProfileForm } from "@/components/ProfileForm";
 import type { Database } from "../../supabase";
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
@@ -346,13 +348,31 @@ export function Sidebar() {
 
       {/* Footer / User */}
       <div className="p-4 border-t border-sidebar-border space-y-1">
+        <Sheet>
+            <SheetTrigger asChild>
+                <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent/50 h-9 px-2"
+                >
+                    <User className="h-4 w-4" />
+                    <span className="text-sm">Profile</span>
+                </Button>
+            </SheetTrigger>
+            <SheetContent side="left">
+                <SheetHeader className="mb-6">
+                    <SheetTitle>Edit Profile</SheetTitle>
+                </SheetHeader>
+                <ProfileForm />
+            </SheetContent>
+        </Sheet>
+
         <Button
             variant="ghost"
-            className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent/50 h-9 px-2"
-            onClick={() => navigate("/profile")}
+            disabled
+            className="w-full justify-start gap-2 text-muted-foreground hover:bg-sidebar-accent/50 h-9 px-2 opacity-50 cursor-not-allowed"
         >
-            <User className="h-4 w-4" />
-            <span className="text-sm">Profile</span>
+            <Settings className="h-4 w-4" />
+            <span className="text-sm">Settings</span>
         </Button>
 
         <Button 

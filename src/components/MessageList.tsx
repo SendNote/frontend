@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { format } from "date-fns";
-import { FileIcon, ImageIcon, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
+import { FileIcon, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
 import type { MessageWithAttachments, Attachment } from "@/types";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
