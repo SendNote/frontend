@@ -3,19 +3,37 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { MessageList } from "@/components/MessageList";
 import { ChatComposer } from "@/components/ChatComposer";
+import { ChannelHeader } from "@/components/ChannelHeader";
 import type { MessageWithAttachments } from "@/types";
+import type { Database } from "../../supabase";
+
+type Channel = Database["public"]["Tables"]["channels"]["Row"];
 
 export function ChatWindow() {
   const { channelId } = useParams();
   const [messages, setMessages] = useState<MessageWithAttachments[]>([]);
   const [loading, setLoading] = useState(true);
+  const [channel, setChannel] = useState<Channel | null>(null);
 
   // Re-fetch when channel changes
   useEffect(() => {
     if (!channelId) return;
     
     setLoading(true);
+    
+    // Fetch channel details
+    async function fetchChannel() {
+        const { data } = await supabase
+            .from("channels")
+            .select("*")
+            .eq("id", channelId!)
+            .single();
+        if (data) setChannel(data);
+    }
+    fetchChannel();
+
     fetchMessages();
+
 
     // Subscribe to NEW messages in this channel
     // Note: We need to be careful with the 'table' filter.
@@ -114,7 +132,8 @@ export function ChatWindow() {
   if (!channelId) return null;
 
   return (
-    <div className="flex flex-col h-full w-full relative">
+    <div className="flex flex-col h-full w-full relative bg-background">
+      {channel && <ChannelHeader channelName={channel.name} />}
       <MessageList 
         messages={messages} 
         loading={loading} 

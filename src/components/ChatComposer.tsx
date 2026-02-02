@@ -113,8 +113,8 @@ export function ChatComposer({ channelId, onSend }: ChatComposerProps) {
   };
 
   return (
-    <div className="p-4 border-t bg-background">
-        <div className="max-w-3xl mx-auto w-full">
+    <div className="sticky bottom-0 p-4 border-t bg-background shadow-[0_-2px_10px_rgba(0,0,0,0.1)] dark:shadow-[0_-2px_10px_rgba(0,0,0,0.3)] z-20">
+        <div className="w-full px-4">
             {/* File Preview */}
             {file && (
             <div className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-md max-w-fit">

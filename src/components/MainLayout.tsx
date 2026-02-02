@@ -11,7 +11,7 @@ export function MainLayout() {
   // For this MVP version, we'll stick to a simple split view that collapses on mobile.
   
   return (
-    <div className="flex h-screen w-full max-w-[1200px] mx-auto border-x border-border shadow-2xl overflow-hidden bg-background">
+    <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Sidebar - hidden on mobile if channel is selected */}
       <div className={cn(
         "h-full transition-all duration-300 ease-in-out",

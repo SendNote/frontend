@@ -14,6 +14,29 @@ interface MessageListProps {
   onEditMessage?: (id: string, newBody: string) => void;
 }
 
+function formatFullTimestamp(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const isYesterday = new Date(now.getTime() - 86400000).toDateString() === date.toDateString();
+  
+  const time = new Intl.DateTimeFormat('default', { 
+    hour: 'numeric', 
+    minute: '2-digit'
+  }).format(date);
+  
+  if (isToday) return `Today at ${time}`;
+  if (isYesterday) return `Yesterday at ${time}`;
+  
+  const dateStr = new Intl.DateTimeFormat('default', { 
+    month: 'short', 
+    day: 'numeric',
+    year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+  }).format(date);
+  
+  return `${dateStr} at ${time}`;
+}
+
 // Helper component to handle async signed URL fetching for private buckets
 function AttachmentItem({ attachment }: { attachment: Attachment }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -72,15 +95,17 @@ function AttachmentItem({ attachment }: { attachment: Attachment }) {
   );
 }
 
+interface MessageItemProps {
+    msg: MessageWithAttachments;
+    onDelete?: (id: string) => void;
+    onEdit?: (id: string, body: string) => void;
+}
+
 function MessageItem({ 
     msg, 
     onDelete, 
-    onEdit 
-}: { 
-    msg: MessageWithAttachments, 
-    onDelete?: (id: string) => void,
-    onEdit?: (id: string, body: string) => void
-}) {
+    onEdit
+}: MessageItemProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editBody, setEditBody] = useState(msg.body || "");
 
@@ -97,15 +122,9 @@ function MessageItem({
     };
 
     return (
-        <div className="flex flex-col items-end space-y-1 group w-full">
-            <div
-                className={cn(
-                    "max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm break-words relative",
-                    isEditing 
-                        ? "bg-background text-foreground border border-input p-2 rounded-md" 
-                        : "bg-primary text-primary-foreground rounded-tr-sm"
-                )}
-            >
+        <div className="group w-full hover:bg-muted/30 transition-colors pt-4 pb-2">
+            <div className="px-6 flex flex-col w-full">
+                
                 {/* Attachments */}
                 {msg.attachments && msg.attachments.length > 0 && (
                     <div className="mb-2 space-y-2">
@@ -115,70 +134,71 @@ function MessageItem({
                     </div>
                 )}
 
-                {/* Text Body */}
+                {/* Message Body */}
                 {isEditing ? (
-                    <div className="flex flex-col gap-2 min-w-[200px]">
+                    <div className="flex flex-col gap-2 w-full">
                         <Textarea 
                             value={editBody} 
                             onChange={(e) => setEditBody(e.target.value)}
-                            className="text-foreground bg-background min-h-[60px] border-input"
+                            className="text-foreground bg-background min-h-[60px] border-input w-full"
                         />
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-2">
                              <Button 
-                                size="icon" 
+                                size="sm" 
                                 variant="ghost" 
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10" 
                                 onClick={handleCancel}
-                                title="Cancel"
                             >
-                                <X className="h-3 w-3" />
+                                Cancel
                             </Button>
                             <Button 
-                                size="icon" 
-                                variant="ghost"
-                                className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100" 
+                                size="sm" 
                                 onClick={handleSave}
-                                title="Save"
                             >
-                                <Check className="h-3 w-3" />
+                                Save
                             </Button>
                         </div>
                     </div>
                 ) : (
-                    msg.body && <p className="whitespace-pre-wrap">{msg.body}</p>
+                    msg.body && (
+                        <p className="whitespace-pre-wrap text-base text-foreground leading-relaxed break-words">
+                            {msg.body}
+                        </p>
+                    )
                 )}
-            </div>
-          
-            {/* Timestamp & Actions */}
-            <div className="flex items-center gap-2">
-                 <span className="text-[10px] text-muted-foreground select-none">
-                    {new Intl.DateTimeFormat('default', { hour: 'numeric', minute: 'numeric' }).format(new Date(msg.created_at))}
-                </span>
-
-                {/* Actions: Only show if not editing */}
+            
+                {/* Timestamp & Actions - Only show if not editing */}
                 {!isEditing && (
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                        <button 
-                            onClick={() => setIsEditing(true)}
-                            className="text-muted-foreground hover:text-foreground p-0.5 rounded"
-                            title="Edit"
-                        >
-                            <Pencil className="h-3 w-3" />
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (confirm("Delete this message?")) {
-                                    onDelete?.(msg.id);
-                                }
-                            }}
-                            className="text-muted-foreground hover:text-destructive p-0.5 rounded"
-                            title="Delete"
-                        >
-                            <Trash2 className="h-3 w-3" />
-                        </button>
+                    <div className="flex items-center justify-end gap-2 mt-2">
+                        <span className="text-xs text-muted-foreground select-none">
+                            {formatFullTimestamp(msg.created_at)}
+                        </span>
+
+                        <div className="flex gap-1 items-center">
+                            <button 
+                                onClick={() => setIsEditing(true)}
+                                className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
+                                title="Edit"
+                            >
+                                <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (confirm("Delete this message?")) {
+                                        onDelete?.(msg.id);
+                                    }
+                                }}
+                                className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
+                                title="Delete"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
+
+            {/* Divider */}
+            <div className="border-b border-border/80 w-full mt-2 ml-4 mr-4" />
         </div>
     );
 }
@@ -205,8 +225,8 @@ export function MessageList({ messages, loading, onDeleteMessage, onEditMessage 
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 w-full">
-      <div className="flex flex-col space-y-4 max-w-3xl mx-auto w-full">
+    <div className="flex-1 overflow-y-auto w-full">
+      <div className="flex flex-col w-full pb-4">
         {messages.map((msg) => (
             <MessageItem 
                 key={msg.id} 
