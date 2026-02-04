@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef, type FormEvent } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { Plus, Hash, LogOut, MoreVertical, Pencil, Trash2, Check, X, User, Settings } from "lucide-react";
+import { Plus, Hash, LogOut, MoreVertical, Pencil, Trash2, Check, X, User, Settings, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ProfileForm } from "@/components/ProfileForm";
+import { SearchOverlay } from "@/components/SearchOverlay";
 import type { Database } from "../../supabase";
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
@@ -144,6 +145,7 @@ export function Sidebar() {
   const [loading, setLoading] = useState(true);
   const [newChannelName, setNewChannelName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
     fetchChannels();
@@ -298,15 +300,26 @@ export function Sidebar() {
       {/* Header */}
       <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
         <h2 className="font-semibold text-lg tracking-tight">Sendnote</h2>
-        <Button 
+        <div className="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsSearchOpen(true)}
+            title="Search Messages"
+            className="h-8 w-8 hidden md:inline-flex"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+          <Button 
             variant="ghost" 
             size="icon" 
             onClick={() => setIsCreating(!isCreating)}
             title="Create Channel"
             className="h-8 w-8"
-        >
+          >
             <Plus className="h-4 w-4" />
-        </Button>
+          </Button>
+        </div>
       </div>
 
       {/* Channel List */}
@@ -384,6 +397,7 @@ export function Sidebar() {
             <span className="text-sm">Sign Out</span>
         </Button>
       </div>
+      <SearchOverlay open={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { FileIcon, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
 import type { MessageWithAttachments, Attachment } from "@/types";
-import { cn } from "@/lib/utils";
+import { cn, formatFullTimestamp } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,28 +14,7 @@ interface MessageListProps {
   onEditMessage?: (id: string, newBody: string) => void;
 }
 
-function formatFullTimestamp(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  const isYesterday = new Date(now.getTime() - 86400000).toDateString() === date.toDateString();
-  
-  const time = new Intl.DateTimeFormat('default', { 
-    hour: 'numeric', 
-    minute: '2-digit'
-  }).format(date);
-  
-  if (isToday) return `Today at ${time}`;
-  if (isYesterday) return `Yesterday at ${time}`;
-  
-  const dateStr = new Intl.DateTimeFormat('default', { 
-    month: 'short', 
-    day: 'numeric',
-    year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-  }).format(date);
-  
-  return `${dateStr} at ${time}`;
-}
+// formatFullTimestamp moved to @/lib/utils
 
 // Helper component to handle async signed URL fetching for private buckets
 function AttachmentItem({ attachment }: { attachment: Attachment }) {
