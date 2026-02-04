@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { MessageList } from "@/components/MessageList";
 import { ChatComposer } from "@/components/ChatComposer";
 import { ChannelHeader } from "@/components/ChannelHeader";
+import { useChatCache } from "@/contexts/ChatCacheContext";
 import type { MessageWithAttachments } from "@/types";
 import type { Database } from "../../supabase";
 
@@ -14,26 +15,25 @@ export function ChatWindow() {
   const [messages, setMessages] = useState<MessageWithAttachments[]>([]);
   const [loading, setLoading] = useState(true);
   const [channel, setChannel] = useState<Channel | null>(null);
+  const { getCachedChannel, setCachedChannel, updateCachedMessages } = useChatCache();
 
   // Re-fetch when channel changes
   useEffect(() => {
     if (!channelId) return;
+
+    // Check cache first
+    const cached = getCachedChannel(channelId);
     
-    setLoading(true);
-    
-    // Fetch channel details
-    async function fetchChannel() {
-        const { data } = await supabase
-            .from("channels")
-            .select("*")
-            .eq("id", channelId!)
-            .single();
-        if (data) setChannel(data);
+    if (cached) {
+      // Cache hit - use cached data immediately
+      setMessages(cached.messages);
+      setChannel(cached.channel);
+      setLoading(false);
+    } else {
+      // Cache miss - fetch from server
+      setLoading(true);
+      fetchChannelAndMessages();
     }
-    fetchChannel();
-
-    fetchMessages();
-
 
     // Subscribe to NEW messages in this channel
     // Note: We need to be careful with the 'table' filter.
@@ -66,41 +66,100 @@ export function ChatWindow() {
     };
   }, [channelId]);
 
-  async function fetchMessages() {
+  // Combined function for initial load
+  async function fetchChannelAndMessages() {
     if (!channelId) return;
 
-    // Correct Left Join syntax for optional relations:
+    // Fetch channel metadata
+    const { data: channelData, error: channelError } = await supabase
+      .from("channels")
+      .select("*")
+      .eq("id", channelId)
+      .single();
+
+    if (channelError) {
+      console.error("Error fetching channel:", channelError);
+      setLoading(false);
+      return;
+    }
+
+    // Fetch messages with attachments
     const { data: allMessages, error: fetchError } = await supabase
-        .from("messages")
-        .select(`
-            *,
-            message_attachments (
-                attachment:attachments (*)
-            )
-        `)
-        .eq("channel_id", channelId)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: true });
+      .from("messages")
+      .select(`
+        *,
+        message_attachments (
+          attachment:attachments (*)
+        )
+      `)
+      .eq("channel_id", channelId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true });
 
     if (fetchError) {
       console.error("Error fetching messages:", fetchError);
-    } else {
-        // Transform the nested data structure to match our simpler MessageWithAttachments type
-        const formatted: MessageWithAttachments[] = (allMessages || []).map((msg: any) => ({
-            ...msg,
-            // Extract the actual attachment objects from the join table array
-            attachments: msg.message_attachments.map((ma: any) => ma.attachment).filter(Boolean)
-        }));
-        setMessages(formatted);
+      setLoading(false);
+      return;
     }
+
+    // Transform data
+    const formatted: MessageWithAttachments[] = (allMessages || []).map((msg: any) => ({
+      ...msg,
+      attachments: msg.message_attachments.map((ma: any) => ma.attachment).filter(Boolean)
+    }));
+
+    // Update local state
+    setMessages(formatted);
+    setChannel(channelData);
     setLoading(false);
+
+    // Update cache
+    setCachedChannel(channelId, formatted, channelData);
+  }
+
+  // Separate function for realtime updates (doesn't need channel data)
+  async function fetchMessages() {
+    if (!channelId) return;
+
+    const { data: allMessages, error: fetchError } = await supabase
+      .from("messages")
+      .select(`
+        *,
+        message_attachments (
+          attachment:attachments (*)
+        )
+      `)
+      .eq("channel_id", channelId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true });
+
+    if (fetchError) {
+      console.error("Error fetching messages:", fetchError);
+      return;
+    }
+
+    const formatted: MessageWithAttachments[] = (allMessages || []).map((msg: any) => ({
+      ...msg,
+      attachments: msg.message_attachments.map((ma: any) => ma.attachment).filter(Boolean)
+    }));
+
+    setMessages(formatted);
+    
+    // Update cache with new messages
+    updateCachedMessages(channelId, formatted);
   }
 
   const handleDeleteMessage = async (id: string) => {
-    // 1. Optimistic Update
-    setMessages(prev => prev.filter(m => m.id !== id));
+    // 1. Optimistic Update - Update local state
+    const updatedMessages = messages.filter(m => m.id !== id);
+    setMessages(updatedMessages);
 
-    // 2. Server Update
+    // 2. Update cache
+    if (channelId) {
+      updateCachedMessages(channelId, updatedMessages);
+    }
+
+    // 3. Server Update
     const { error } = await supabase
         .from("messages")
         .update({ deleted_at: new Date().toISOString() })
@@ -114,10 +173,18 @@ export function ChatWindow() {
   };
 
   const handleEditMessage = async (id: string, newBody: string) => {
-    // 1. Optimistic Update
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, body: newBody } : m));
+    // 1. Optimistic Update - Update local state
+    const updatedMessages = messages.map(m => 
+      m.id === id ? { ...m, body: newBody } : m
+    );
+    setMessages(updatedMessages);
 
-    // 2. Server Update
+    // 2. Update cache
+    if (channelId) {
+      updateCachedMessages(channelId, updatedMessages);
+    }
+
+    // 3. Server Update
     const { error } = await supabase
         .from("messages")
         .update({ body: newBody })
@@ -125,6 +192,7 @@ export function ChatWindow() {
     
     if (error) {
         console.error("Error editing message:", error);
+        // Revert on error would be ideal, but for MVP we'll just alert or re-fetch
         fetchMessages();
     }
   };

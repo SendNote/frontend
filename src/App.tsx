@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/components/AuthProvider";
+import { ChatCacheProvider } from "@/contexts/ChatCacheContext";
 import { AuthPage } from "@/components/AuthPage";
 import { PrivateRoute } from "@/components/PrivateRoute";
 import { MainLayout } from "@/components/MainLayout";
@@ -11,15 +12,17 @@ export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<AuthPage />} />
-          <Route element={<PrivateRoute />}>
-            <Route path="/" element={<MainLayout />}>
-              <Route path="channel/:channelId" element={<ChatWindow />} />
+        <ChatCacheProvider>
+          <Routes>
+            <Route path="/login" element={<AuthPage />} />
+            <Route element={<PrivateRoute />}>
+              <Route path="/" element={<MainLayout />}>
+                <Route path="channel/:channelId" element={<ChatWindow />} />
+              </Route>
+              <Route path="/profile" element={<ProfilePage />} />
             </Route>
-            <Route path="/profile" element={<ProfilePage />} />
-          </Route>
-        </Routes>
+          </Routes>
+        </ChatCacheProvider>
       </AuthProvider>
     </BrowserRouter>
   );
