@@ -1,10 +1,12 @@
 import { useRef, useEffect, useState } from "react";
-import { FileIcon, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
+import { FileIcon, Loader2, Pencil, Trash2, Check, X, Eye, EyeOff } from "lucide-react";
 import type { MessageWithAttachments, Attachment } from "@/types";
 import { cn, formatFullTimestamp } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { MarkdownContent } from "@/components/MarkdownContent";
+import { useDebounce } from "@/hooks/useDebounce";
 import "dotenv";
 
 interface MessageListProps {
@@ -87,17 +89,21 @@ function MessageItem({
 }: MessageItemProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editBody, setEditBody] = useState(msg.body || "");
+    const [showPreview, setShowPreview] = useState(false);
+    const debouncedEditBody = useDebounce(editBody, 200);
 
     const handleSave = () => {
         if (editBody.trim() !== msg.body) {
             onEdit?.(msg.id, editBody);
         }
         setIsEditing(false);
+        setShowPreview(false);
     };
 
     const handleCancel = () => {
         setEditBody(msg.body || "");
         setIsEditing(false);
+        setShowPreview(false);
     };
 
     return (
@@ -116,11 +122,34 @@ function MessageItem({
                 {/* Message Body */}
                 {isEditing ? (
                     <div className="flex flex-col gap-2 w-full">
-                        <Textarea 
-                            value={editBody} 
-                            onChange={(e) => setEditBody(e.target.value)}
-                            className="text-foreground bg-background min-h-[60px] border-input w-full"
-                        />
+                         <div className="flex justify-end">
+                            <button 
+                                onClick={() => setShowPreview(!showPreview)} 
+                                className="text-xs flex items-center gap-1.5 text-muted-foreground hover:text-foreground mb-1"
+                                title="Toggle Preview"
+                            >
+                                {showPreview ? <EyeOff className="w-3.5 h-3.5"/> : <Eye className="w-3.5 h-3.5"/>}
+                                {showPreview ? "Hide Preview" : "Preview"}
+                            </button>
+                        </div>
+
+                        <div className={cn("flex gap-4", showPreview ? "flex-col lg:flex-row items-stretch" : "")}>
+                            <Textarea 
+                                value={editBody} 
+                                onChange={(e) => setEditBody(e.target.value)}
+                                className={cn(
+                                    "text-foreground bg-background border-input w-full resize-none transition-all duration-200", 
+                                    showPreview ? "lg:w-1/2 min-h-[150px] max-h-[300px]" : "min-h-[60px]"
+                                )}
+                            />
+                            
+                            {showPreview && (
+                                <div className="w-full lg:w-1/2 min-h-[150px] max-h-[300px] h-full overflow-y-auto p-3 rounded-md border border-input bg-background/50">
+                                    <MarkdownContent content={debouncedEditBody} className="text-sm" />
+                                </div>
+                            )}
+                        </div>
+
                         <div className="flex justify-end gap-2">
                              <Button 
                                 size="sm" 
@@ -139,9 +168,10 @@ function MessageItem({
                     </div>
                 ) : (
                     msg.body && (
-                        <p className="whitespace-pre-wrap text-base text-foreground leading-relaxed break-words">
-                            {msg.body}
-                        </p>
+                        <MarkdownContent 
+                            content={msg.body} 
+                            className="text-base text-foreground leading-relaxed break-words"
+                        />
                     )
                 )}
             

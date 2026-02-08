@@ -1,9 +1,11 @@
 import { useState, useRef, type FormEvent, type ChangeEvent } from "react";
-import { Send, Paperclip, X, File as FileIcon } from "lucide-react";
+import { Send, Paperclip, X, File as FileIcon, Eye, EyeOff, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { MarkdownContent } from "@/components/MarkdownContent";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface ChatComposerProps {
   channelId: string;
@@ -14,7 +16,10 @@ export function ChatComposer({ channelId, onSend }: ChatComposerProps) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const debouncedText = useDebounce(text, 200);
 
   const canSend = (text.trim().length > 0 || file !== null) && !isSending;
 
@@ -115,6 +120,28 @@ export function ChatComposer({ channelId, onSend }: ChatComposerProps) {
   return (
     <div className="sticky bottom-0 p-4 border-t bg-background shadow-[0_-2px_10px_rgba(0,0,0,0.1)] dark:shadow-[0_-2px_10px_rgba(0,0,0,0.3)] z-20">
         <div className="w-full px-4">
+            {/* Toolbar */}
+            <div className="flex justify-end gap-3 mb-2 px-1">
+                <button 
+                    type="button"
+                    onClick={() => setShowPreview(!showPreview)} 
+                    className="text-xs flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    {showPreview ? <EyeOff className="w-3.5 h-3.5"/> : <Eye className="w-3.5 h-3.5"/>}
+                    {showPreview ? "Hide Preview" : "Preview"}
+                </button>
+                <a 
+                    href="https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-xs flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                    title="View GitHub Flavored Markdown Guide"
+                >
+                    <HelpCircle className="w-3.5 h-3.5"/> 
+                    Markdown
+                </a>
+            </div>
+
             {/* File Preview */}
             {file && (
             <div className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-md max-w-fit">
@@ -124,40 +151,56 @@ export function ChatComposer({ channelId, onSend }: ChatComposerProps) {
                     <X className="h-4 w-4" />
                 </button>
             </div>
-        )}
+            )}
 
-        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
-            <input 
-                type="file" 
-                ref={fileInputRef}
-                className="hidden" 
-                onChange={handleFileSelect} 
-            />
-            
-            <Button 
-                type="button" 
-                variant="ghost" 
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-muted-foreground hover:text-foreground"
-                title="Attach file"
-            >
-                <Paperclip className="h-5 w-5" />
-            </Button>
+            <div className={cn("flex gap-4", showPreview ? "flex-col lg:flex-row items-stretch" : "items-end")}>
+                <form onSubmit={handleSubmit} className={cn("flex gap-2 items-end transition-all duration-200", showPreview ? "w-full lg:w-1/2" : "w-full")}>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        onChange={handleFileSelect} 
+                    />
+                    
+                    <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-muted-foreground hover:text-foreground shrink-0 mb-0.5"
+                        title="Attach file"
+                    >
+                        <Paperclip className="h-5 w-5" />
+                    </Button>
 
-            <Textarea 
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type a note..."
-                className="min-h-[44px] max-h-[150px] resize-none py-3"
-                rows={1}
-            />
+                    <Textarea 
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Type a note..."
+                        className={cn(
+                            "py-3 resize-none transition-all duration-200", 
+                            showPreview ? "min-h-[150px] max-h-[400px]" : "min-h-[44px] max-h-[150px]"
+                        )}
+                        rows={1}
+                    />
 
-            <Button type="submit" disabled={!canSend} size="icon">
-                <Send className="h-4 w-4" />
-            </Button>
-            </form>
+                    <Button type="submit" disabled={!canSend} size="icon" className="shrink-0 mb-0.5">
+                        <Send className="h-4 w-4" />
+                    </Button>
+                </form>
+
+                {/* Live Preview Panel */}
+                {showPreview && (
+                    <div className="w-full lg:w-1/2 min-h-[150px] max-h-[400px] h-full overflow-y-auto p-3 rounded-md border border-input bg-background/50 animate-in fade-in slide-in-from-top-2 duration-200">
+                        {debouncedText ? (
+                            <MarkdownContent content={debouncedText} className="text-sm" />
+                        ) : (
+                            <span className="text-muted-foreground italic text-sm select-none">Preview will appear here...</span>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { MainLayout } from "@/components/MainLayout";
 import { ChatWindow } from "@/components/ChatWindow";
 import { ProfilePage } from "@/components/ProfilePage";
 import "./index.css";
+import "./styles/markdown.css";
 
 export function App() {
   return (
