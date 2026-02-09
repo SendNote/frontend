@@ -1,19 +1,23 @@
-import { useRef, useEffect, useState } from "react";
-import { FileIcon, Loader2, Pencil, Trash2, Check, X, Eye, EyeOff } from "lucide-react";
-import type { MessageWithAttachments, Attachment } from "@/types";
+import { useRef, useEffect, useState, useCallback } from "react";
+import { FileIcon, Loader2, Pencil, Trash2, Eye, EyeOff, Reply } from "lucide-react";
+import type { MessageWithReferences, Attachment, MessageWithAttachments } from "@/types";
 import { cn, formatFullTimestamp } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { useDebounce } from "@/hooks/useDebounce";
+import { MessageReferencePreview } from "@/components/MessageReferencePreview";
+import { MessageReferenceBadge } from "@/components/MessageReferenceBadge";
+import { BackReferences } from "@/components/BackReferences";
 import "dotenv";
 
 interface MessageListProps {
-  messages: MessageWithAttachments[];
+  messages: MessageWithReferences[];
   loading: boolean;
   onDeleteMessage?: (id: string) => void;
   onEditMessage?: (id: string, newBody: string) => void;
+  onReply?: (message: MessageWithAttachments) => void;
 }
 
 // formatFullTimestamp moved to @/lib/utils
@@ -77,15 +81,21 @@ function AttachmentItem({ attachment }: { attachment: Attachment }) {
 }
 
 interface MessageItemProps {
-    msg: MessageWithAttachments;
+    msg: MessageWithReferences;
     onDelete?: (id: string) => void;
     onEdit?: (id: string, body: string) => void;
+    onReply?: (message: MessageWithAttachments) => void;
+    onJumpTo: (messageId: string) => void;
+    attachRef: (id: string, el: HTMLDivElement | null) => void;
 }
 
 function MessageItem({ 
     msg, 
     onDelete, 
-    onEdit
+    onEdit,
+    onReply,
+    onJumpTo,
+    attachRef
 }: MessageItemProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editBody, setEditBody] = useState(msg.body || "");
@@ -106,10 +116,41 @@ function MessageItem({
         setShowPreview(false);
     };
 
+    // Determine reference display mode
+    // Filter out null references (deleted messages might still have record but null joined data depending on query)
+    // But our query uses inner join !referenced_message so it might be missing if we used strict join, 
+    // but typically we want left join behavior.
+    // The previous implementation used left join logic in transformation.
+    const validReferences = msg.references?.filter(r => r.referenced_message !== undefined) || [];
+
     return (
-        <div className="group w-full hover:bg-muted/30 transition-colors pt-4 pb-2">
+        <div 
+            ref={(el) => attachRef(msg.id, el)}
+            className="group w-full hover:bg-muted/30 transition-colors pt-4 pb-2"
+        >
             <div className="px-6 flex flex-col w-full">
                 
+                {/* References Display (Forward Refs) */}
+                {validReferences.length === 1 && (
+                    <MessageReferencePreview
+                        message={validReferences[0]?.referenced_message ?? null}
+                        onJumpTo={onJumpTo}
+                        className="mb-2"
+                    />
+                )}
+                
+                {validReferences.length > 1 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                        {validReferences.map((ref) => (
+                            <MessageReferenceBadge
+                                key={ref.referenced_message_id}
+                                message={ref.referenced_message}
+                                onJumpTo={onJumpTo}
+                            />
+                        ))}
+                    </div>
+                )}
+
                 {/* Attachments */}
                 {msg.attachments && msg.attachments.length > 0 && (
                     <div className="mb-2 space-y-2">
@@ -182,7 +223,22 @@ function MessageItem({
                             {formatFullTimestamp(msg.created_at)}
                         </span>
 
-                        <div className="flex gap-1 items-center">
+                        {/* Back References Indicator */}
+                        {msg.referenced_by && msg.referenced_by.length > 0 && (
+                            <BackReferences
+                                messages={msg.referenced_by}
+                                onJumpTo={onJumpTo}
+                            />
+                        )}
+
+                        <div className="flex gap-1 items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                             <button 
+                                onClick={() => onReply?.(msg)}
+                                className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
+                                title="Reply"
+                            >
+                                <Reply className="h-3.5 w-3.5" />
+                            </button>
                             <button 
                                 onClick={() => setIsEditing(true)}
                                 className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
@@ -212,13 +268,33 @@ function MessageItem({
     );
 }
 
-export function MessageList({ messages, loading, onDeleteMessage, onEditMessage }: MessageListProps) {
+export function MessageList({ messages, loading, onDeleteMessage, onEditMessage, onReply }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages.length]); // Only scroll on count change to avoid jumps on updates
+
+  const scrollToMessage = useCallback((messageId: string) => {
+    const element = messageRefs.current.get(messageId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('message-highlight');
+      setTimeout(() => {
+        element.classList.remove('message-highlight');
+      }, 2500);
+    }
+  }, []);
+
+  const attachRef = useCallback((id: string, el: HTMLDivElement | null) => {
+      if (el) {
+          messageRefs.current.set(id, el);
+      } else {
+          messageRefs.current.delete(id);
+      }
+  }, []);
 
   if (loading) {
     return <div className="flex-1 flex items-center justify-center text-muted-foreground">Loading messages...</div>;
@@ -242,6 +318,9 @@ export function MessageList({ messages, loading, onDeleteMessage, onEditMessage 
                 msg={msg} 
                 onDelete={onDeleteMessage}
                 onEdit={onEditMessage}
+                onReply={onReply}
+                onJumpTo={scrollToMessage}
+                attachRef={attachRef}
             />
         ))}
         <div ref={bottomRef} />

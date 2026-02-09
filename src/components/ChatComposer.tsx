@@ -6,13 +6,23 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { useDebounce } from "@/hooks/useDebounce";
+import { MessageReferencePreview } from "@/components/MessageReferencePreview";
+import { createMessageReferences } from "@/lib/messageReferences";
+import type { MessageWithAttachments } from "@/types";
 
 interface ChatComposerProps {
   channelId: string;
   onSend?: () => void;
+  replyingTo?: MessageWithAttachments[];
+  onReplyChange?: (messages: MessageWithAttachments[]) => void;
 }
 
-export function ChatComposer({ channelId, onSend }: ChatComposerProps) {
+export function ChatComposer({ 
+  channelId, 
+  onSend,
+  replyingTo = [],
+  onReplyChange 
+}: ChatComposerProps) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -27,6 +37,11 @@ export function ChatComposer({ channelId, onSend }: ChatComposerProps) {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
     }
+  };
+
+  const removeReply = (messageId: string) => {
+    const updated = replyingTo.filter(m => m.id !== messageId);
+    onReplyChange?.(updated);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -95,10 +110,22 @@ export function ChatComposer({ channelId, onSend }: ChatComposerProps) {
             if (linkError) throw linkError;
         }
 
+        // 4. Create References (if any)
+        if (replyingTo.length > 0 && msgData?.id) {
+            const referencedIds = replyingTo.map(m => m.id);
+            const { error: refError } = await createMessageReferences(msgData.id, referencedIds);
+            
+            if (refError) {
+                console.error("Error creating references:", refError);
+                // Don't fail the entire operation, just log
+            }
+        }
+
         // Reset form
         setText("");
         setFile(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
+        onReplyChange?.([]); // Clear replies
         onSend?.();
 
     } catch (error) {
@@ -120,6 +147,34 @@ export function ChatComposer({ channelId, onSend }: ChatComposerProps) {
   return (
     <div className="sticky bottom-0 p-4 border-t bg-background shadow-[0_-2px_10px_rgba(0,0,0,0.1)] dark:shadow-[0_-2px_10px_rgba(0,0,0,0.3)] z-20">
         <div className="w-full px-4">
+            
+            {/* Reply Preview Area - Add BEFORE toolbar */}
+            {replyingTo.length > 0 && (
+                <div className="mb-3 p-3 rounded-md border bg-muted/30">
+                    <div className="text-xs text-muted-foreground mb-2 font-medium">
+                        Replying to {replyingTo.length} message{replyingTo.length === 1 ? '' : 's'}:
+                    </div>
+                    <div className="space-y-2">
+                        {replyingTo.map((msg) => (
+                            <div key={msg.id} className="flex items-start gap-2">
+                                <MessageReferencePreview
+                                    message={msg}
+                                    onRemove={() => removeReply(msg.id)}
+                                    className="flex-1 mb-0" // override mb-2
+                                />
+                                <button
+                                    onClick={() => removeReply(msg.id)}
+                                    className="p-1.5 hover:bg-destructive/10 hover:text-destructive rounded transition-colors mt-1"
+                                    title="Remove"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Toolbar */}
             <div className="flex justify-end gap-3 mb-2 px-1">
                 <button 
@@ -205,4 +260,3 @@ export function ChatComposer({ channelId, onSend }: ChatComposerProps) {
     </div>
   );
 }
-

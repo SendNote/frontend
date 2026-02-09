@@ -27,9 +27,31 @@
 }
 
 @media (prefers-reduced-motion) {
-  *,
+  *:not(.message-highlight),
   ::before,
   ::after {
     animation: none !important;
   }
+}
+
+@keyframes message-highlight-flash {
+  0% { 
+    box-shadow: inset 4px 0 0 0 transparent;
+  }
+  25% { 
+    box-shadow: inset 4px 0 0 0 hsl(var(--primary));
+  }
+  50% { 
+    box-shadow: inset 4px 0 0 0 transparent;
+  }
+  75% { 
+    box-shadow: inset 4px 0 0 0 hsl(var(--primary));
+  }
+  100% { 
+    box-shadow: inset 4px 0 0 0 transparent;
+  }
+}
+
+.message-highlight {
+  animation: message-highlight-flash 2.5s ease-in-out !important;
 }

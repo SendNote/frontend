@@ -1,32 +1,49 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { MessageList } from "@/components/MessageList";
 import { ChatComposer } from "@/components/ChatComposer";
 import { ChannelHeader } from "@/components/ChannelHeader";
 import { useChatCache } from "@/contexts/ChatCacheContext";
-import type { MessageWithAttachments } from "@/types";
+import type { MessageWithReferences, MessageWithAttachments } from "@/types";
 import type { Database } from "../../supabase";
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 
 export function ChatWindow() {
   const { channelId } = useParams();
-  const [messages, setMessages] = useState<MessageWithAttachments[]>([]);
+  const [messages, setMessages] = useState<MessageWithReferences[]>([]);
   const [loading, setLoading] = useState(true);
   const [channel, setChannel] = useState<Channel | null>(null);
   const { getCachedChannel, setCachedChannel, updateCachedMessages } = useChatCache();
+  
+  // Reply state
+  const [replyingTo, setReplyingTo] = useState<MessageWithAttachments[]>([]);
+
+  // Reply handler
+  const handleReply = useCallback((message: MessageWithAttachments) => {
+    setReplyingTo(prev => {
+      // Prevent duplicates
+      if (prev.find(m => m.id === message.id)) {
+        return prev;
+      }
+      return [...prev, message];
+    });
+  }, []);
 
   // Re-fetch when channel changes
   useEffect(() => {
     if (!channelId) return;
+
+    // Reset reply state on channel change
+    setReplyingTo([]);
 
     // Check cache first
     const cached = getCachedChannel(channelId);
     
     if (cached) {
       // Cache hit - use cached data immediately
-      setMessages(cached.messages);
+      setMessages(cached.messages as MessageWithReferences[]);
       setChannel(cached.channel);
       setLoading(false);
     } else {
@@ -36,8 +53,6 @@ export function ChatWindow() {
     }
 
     // Subscribe to NEW messages in this channel
-    // Note: We need to be careful with the 'table' filter.
-    // Ideally we filter by channel_id, but supabase realtime filter syntax needs to be precise.
     const subscription = supabase
       .channel(`room:${channelId}`)
       .on(
@@ -48,10 +63,7 @@ export function ChatWindow() {
           table: 'messages',
           filter: `channel_id=eq.${channelId}` 
         }, 
-        (payload) => {
-          // When a new message arrives, we need to fetch its attachments (if any)
-          // For now, we'll just re-fetch the single message with relations
-          // Or simplest: just re-fetch the list (less efficient but reliable for MVP)
+        () => {
           fetchMessages(); 
         }
       )
@@ -60,9 +72,30 @@ export function ChatWindow() {
             console.log('ChatWindow Subscription status:', status);
          }
       });
+      
+    // Subscribe to reference changes
+    const referencesSubscription = supabase
+      .channel(`references:${channelId}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'message_references'
+        },
+        () => {
+          fetchMessages();
+        }
+      )
+      .subscribe((status) => {
+        if (status !== 'SUBSCRIBED') {
+          console.log('References subscription status:', status);
+        }
+      });
 
     return () => {
       supabase.removeChannel(subscription);
+      supabase.removeChannel(referencesSubscription);
     };
   }, [channelId]);
 
@@ -83,13 +116,31 @@ export function ChatWindow() {
       return;
     }
 
-    // Fetch messages with attachments
+    // Fetch messages with attachments and references
     const { data: allMessages, error: fetchError } = await supabase
       .from("messages")
       .select(`
         *,
         message_attachments (
           attachment:attachments (*)
+        ),
+        references:message_references!source_message_id (
+          referenced_message_id,
+          referenced_message:messages!referenced_message_id (
+            *,
+            message_attachments (
+              attachment:attachments (*)
+            )
+          )
+        ),
+        referenced_by:message_references!referenced_message_id (
+          source_message_id,
+          source_message:messages!source_message_id (
+            id,
+            body,
+            created_at,
+            channel_id
+          )
         )
       `)
       .eq("channel_id", channelId)
@@ -103,9 +154,17 @@ export function ChatWindow() {
     }
 
     // Transform data
-    const formatted: MessageWithAttachments[] = (allMessages || []).map((msg: any) => ({
+    const formatted: MessageWithReferences[] = (allMessages || []).map((msg: any) => ({
       ...msg,
-      attachments: msg.message_attachments.map((ma: any) => ma.attachment).filter(Boolean)
+      attachments: msg.message_attachments?.map((ma: any) => ma.attachment).filter(Boolean) || [],
+      references: (msg.references || []).map((ref: any) => ({
+        referenced_message_id: ref.referenced_message_id,
+        referenced_message: ref.referenced_message ? {
+          ...ref.referenced_message,
+          attachments: ref.referenced_message.message_attachments?.map((ma: any) => ma.attachment).filter(Boolean) || []
+        } : null
+      })),
+      referenced_by: msg.referenced_by || []
     }));
 
     // Update local state
@@ -127,6 +186,24 @@ export function ChatWindow() {
         *,
         message_attachments (
           attachment:attachments (*)
+        ),
+        references:message_references!source_message_id (
+          referenced_message_id,
+          referenced_message:messages!referenced_message_id (
+            *,
+            message_attachments (
+              attachment:attachments (*)
+            )
+          )
+        ),
+        referenced_by:message_references!referenced_message_id (
+          source_message_id,
+          source_message:messages!source_message_id (
+            id,
+            body,
+            created_at,
+            channel_id
+          )
         )
       `)
       .eq("channel_id", channelId)
@@ -138,9 +215,17 @@ export function ChatWindow() {
       return;
     }
 
-    const formatted: MessageWithAttachments[] = (allMessages || []).map((msg: any) => ({
+    const formatted: MessageWithReferences[] = (allMessages || []).map((msg: any) => ({
       ...msg,
-      attachments: msg.message_attachments.map((ma: any) => ma.attachment).filter(Boolean)
+      attachments: msg.message_attachments?.map((ma: any) => ma.attachment).filter(Boolean) || [],
+      references: (msg.references || []).map((ref: any) => ({
+        referenced_message_id: ref.referenced_message_id,
+        referenced_message: ref.referenced_message ? {
+          ...ref.referenced_message,
+          attachments: ref.referenced_message.message_attachments?.map((ma: any) => ma.attachment).filter(Boolean) || []
+        } : null
+      })),
+      referenced_by: msg.referenced_by || []
     }));
 
     setMessages(formatted);
@@ -207,8 +292,14 @@ export function ChatWindow() {
         loading={loading} 
         onDeleteMessage={handleDeleteMessage}
         onEditMessage={handleEditMessage}
+        onReply={handleReply}
       />
-      <ChatComposer channelId={channelId} onSend={fetchMessages} />
+      <ChatComposer 
+        channelId={channelId} 
+        onSend={fetchMessages}
+        replyingTo={replyingTo}
+        onReplyChange={setReplyingTo}
+      />
     </div>
   );
 }
