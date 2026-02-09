@@ -132,6 +132,39 @@ export type Database = {
           },
         ]
       }
+      message_references: {
+        Row: {
+          created_at: string
+          referenced_message_id: string
+          source_message_id: string
+        }
+        Insert: {
+          created_at?: string
+          referenced_message_id: string
+          source_message_id: string
+        }
+        Update: {
+          created_at?: string
+          referenced_message_id?: string
+          source_message_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_references_referenced_message_id_fkey"
+            columns: ["referenced_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_references_source_message_id_fkey"
+            columns: ["source_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           body: string
@@ -139,6 +172,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           edited_at: string | null
+          fts: unknown
           id: string
           updated_at: string
           user_id: string
@@ -149,6 +183,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           edited_at?: string | null
+          fts?: unknown
           id?: string
           updated_at?: string
           user_id: string
@@ -159,6 +194,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           edited_at?: string | null
+          fts?: unknown
           id?: string
           updated_at?: string
           user_id?: string
