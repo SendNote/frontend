@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { useDebounce } from "@/hooks/useDebounce";
 import { MessageReferencePreview } from "@/components/MessageReferencePreview";
-import { MessageReferenceBadge } from "@/components/MessageReferenceBadge";
+import { MultipleReferences } from "@/components/MultipleReferences";
 import { BackReferences } from "@/components/BackReferences";
 import "dotenv";
 
@@ -131,24 +131,11 @@ function MessageItem({
             <div className="flex flex-col w-full">
                 
                 {/* References Display (Forward Refs) */}
-                {validReferences.length === 1 && (
-                    <MessageReferencePreview
-                        message={validReferences[0]?.referenced_message ?? null}
+                {validReferences.length > 0 && (
+                    <MultipleReferences
+                        references={validReferences}
                         onJumpTo={onJumpTo}
-                        className="mb-2"
                     />
-                )}
-                
-                {validReferences.length > 1 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                        {validReferences.map((ref) => (
-                            <MessageReferenceBadge
-                                key={ref.referenced_message_id}
-                                message={ref.referenced_message}
-                                onJumpTo={onJumpTo}
-                            />
-                        ))}
-                    </div>
                 )}
 
                 {/* Attachments */}
