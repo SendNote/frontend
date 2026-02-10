@@ -79,4 +79,4 @@ Refer to `supabase.ts` for types.
 ## 7. Environment
 
 - `BUN_PUBLIC_SUPABASE_URL`: Project URL.
-- `BUN_PUBLIC_SUPABASE_KEY`: Public API Key.
+- `BUN_PUBLIC_SUPABASE_ANON_KEY`: Public API Key.
