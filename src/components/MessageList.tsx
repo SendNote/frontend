@@ -126,9 +126,9 @@ function MessageItem({
     return (
         <div 
             ref={(el) => attachRef(msg.id, el)}
-            className="group w-full hover:bg-muted/30 transition-colors pt-4 pb-2"
+            className="group w-full bg-background rounded-lg shadow-lg border border-border/30 p-6"
         >
-            <div className="px-6 flex flex-col w-full">
+            <div className="flex flex-col w-full">
                 
                 {/* References Display (Forward Refs) */}
                 {validReferences.length === 1 && (
@@ -262,8 +262,7 @@ function MessageItem({
                 )}
             </div>
 
-            {/* Divider */}
-            <div className="border-b border-border/80 w-full mt-2 ml-4 mr-4" />
+
         </div>
     );
 }
@@ -311,7 +310,7 @@ export function MessageList({ messages, loading, onDeleteMessage, onEditMessage,
 
   return (
     <div className="flex-1 overflow-y-auto w-full">
-      <div className="flex flex-col w-full pb-4">
+      <div className="flex flex-col gap-2 pb-24 px-4 pt-2 w-full">
         {messages.map((msg) => (
             <MessageItem 
                 key={msg.id} 

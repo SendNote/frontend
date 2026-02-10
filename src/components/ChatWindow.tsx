@@ -285,7 +285,7 @@ export function ChatWindow() {
   if (!channelId) return null;
 
   return (
-    <div className="flex flex-col h-full w-full relative bg-background">
+    <div className="flex flex-col h-full w-full relative bg-muted/20">
       {channel && <ChannelHeader channelName={channel.name} />}
       <MessageList 
         messages={messages} 
