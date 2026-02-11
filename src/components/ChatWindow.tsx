@@ -288,6 +288,7 @@ export function ChatWindow() {
     <div className="flex flex-col h-full w-full relative bg-muted/20">
       {channel && <ChannelHeader channelName={channel.name} />}
       <MessageList 
+        channelId={channelId || ''}
         messages={messages} 
         loading={loading} 
         onDeleteMessage={handleDeleteMessage}

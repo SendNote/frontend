@@ -13,11 +13,157 @@ import { BackReferences } from "@/components/BackReferences";
 import "dotenv";
 
 interface MessageListProps {
+  channelId: string;
   messages: MessageWithReferences[];
   loading: boolean;
   onDeleteMessage?: (id: string) => void;
   onEditMessage?: (id: string, newBody: string) => void;
   onReply?: (message: MessageWithAttachments) => void;
+}
+
+
+
+export function MessageList({ channelId, messages, loading, onDeleteMessage, onEditMessage, onReply }: MessageListProps) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  
+  const [currentChannelId, setCurrentChannelId] = useState<string | null>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
+  // Smart scroll: Jump to bottom only on channel switch
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const isChannelSwitch = currentChannelId !== channelId;
+
+    if (isChannelSwitch && messages.length > 0) {
+      // Instant jump to bottom on channel switch
+      // Double RAF to ensure DOM is fully painted and scrollHeight is correct
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            containerRef.current.scrollTop = containerRef.current.scrollHeight;
+            setCurrentChannelId(channelId);
+            setShowScrollButton(false); // Reset button state
+          }
+        });
+      });
+    }
+  }, [channelId, messages.length, currentChannelId]);
+
+  // Detect if user scrolled away from bottom (for "Jump to latest" button)
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current) return;
+    
+    const { scrollHeight, scrollTop, clientHeight } = containerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    
+    // Show button if more than 200px from bottom
+    setShowScrollButton(distanceFromBottom > 200);
+  }, []);
+
+  // Manual jump to bottom (for button)
+  const jumpToBottom = useCallback(() => {
+    if (!containerRef.current) return;
+    containerRef.current.scrollTo({
+      top: containerRef.current.scrollHeight,
+      behavior: 'smooth'
+    });
+  }, []);
+
+  const scrollToMessage = useCallback((messageId: string) => {
+    const element = messageRefs.current.get(messageId);
+    if (element) {
+      // Minimal scroll - only moves if message not fully visible
+      element.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'nearest',
+        inline: 'nearest'
+      });
+      
+      // Highlight animation
+      element.classList.add('message-highlight');
+      setTimeout(() => {
+        element.classList.remove('message-highlight');
+      }, 2500);
+    }
+  }, []);
+
+  const attachRef = useCallback((id: string, el: HTMLDivElement | null) => {
+      if (el) {
+          messageRefs.current.set(id, el);
+      } else {
+          messageRefs.current.delete(id);
+      }
+  }, []);
+
+  if (loading) {
+    return <div className="flex-1 flex items-center justify-center text-muted-foreground">Loading messages...</div>;
+  }
+
+  if (messages.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
+        <p>No messages yet.</p>
+        <p className="text-sm">Send yourself a note to get started.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto w-full relative"
+    >
+      <div className="flex flex-col gap-2 pb-24 px-4 pt-2 w-full">
+        {messages.map((msg) => (
+            <MessageItem 
+                key={msg.id} 
+                msg={msg} 
+                onDelete={onDeleteMessage}
+                onEdit={onEditMessage}
+                onReply={onReply}
+                onJumpTo={scrollToMessage}
+                attachRef={attachRef}
+            />
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Floating "Jump to latest" button */}
+      {showScrollButton && (
+        <button
+          onClick={jumpToBottom}
+          className={cn(
+            "fixed bottom-24 right-8 z-30",
+            "flex items-center gap-2 px-4 py-2",
+            "bg-primary text-primary-foreground",
+            "rounded-full shadow-lg",
+            "hover:bg-primary/90 transition-all",
+            "animate-in slide-in-from-bottom-4 fade-in"
+          )}
+          aria-label="Jump to latest message"
+        >
+          <span className="text-sm font-medium">Jump to latest</span>
+          <svg 
+            className="w-4 h-4" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M19 14l-7 7m0 0l-7-7m7 7V3" 
+            />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
 }
 
 // formatFullTimestamp moved to @/lib/utils
@@ -254,63 +400,4 @@ function MessageItem({
     );
 }
 
-export function MessageList({ messages, loading, onDeleteMessage, onEditMessage, onReply }: MessageListProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  // Auto-scroll to bottom on new messages
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]); // Only scroll on count change to avoid jumps on updates
-
-  const scrollToMessage = useCallback((messageId: string) => {
-    const element = messageRefs.current.get(messageId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      element.classList.add('message-highlight');
-      setTimeout(() => {
-        element.classList.remove('message-highlight');
-      }, 2500);
-    }
-  }, []);
-
-  const attachRef = useCallback((id: string, el: HTMLDivElement | null) => {
-      if (el) {
-          messageRefs.current.set(id, el);
-      } else {
-          messageRefs.current.delete(id);
-      }
-  }, []);
-
-  if (loading) {
-    return <div className="flex-1 flex items-center justify-center text-muted-foreground">Loading messages...</div>;
-  }
-
-  if (messages.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
-        <p>No messages yet.</p>
-        <p className="text-sm">Send yourself a note to get started.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto w-full">
-      <div className="flex flex-col gap-2 pb-24 px-4 pt-2 w-full">
-        {messages.map((msg) => (
-            <MessageItem 
-                key={msg.id} 
-                msg={msg} 
-                onDelete={onDeleteMessage}
-                onEdit={onEditMessage}
-                onReply={onReply}
-                onJumpTo={scrollToMessage}
-                attachRef={attachRef}
-            />
-        ))}
-        <div ref={bottomRef} />
-      </div>
-    </div>
-  );
-}
