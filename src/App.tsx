@@ -1,38 +1,33 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { APITester } from "./APITester";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { AuthProvider } from "@/components/AuthProvider";
+import { ChatCacheProvider } from "@/contexts/ChatCacheContext";
+import { AuthPage } from "@/components/AuthPage";
+import { PrivateRoute } from "@/components/PrivateRoute";
+import { MainLayout } from "@/components/MainLayout";
+import { ChatWindow } from "@/components/ChatWindow";
+import { StarredMessages } from "@/components/StarredMessages";
+import { ProfilePage } from "@/components/ProfilePage";
 import "./index.css";
-
-import logo from "./logo.svg";
-import reactLogo from "./react.svg";
+import "./styles/markdown.css";
 
 export function App() {
   return (
-    <div className="container mx-auto p-8 text-center relative z-10">
-      <div className="flex justify-center items-center gap-8 mb-8">
-        <img
-          src={logo}
-          alt="Bun Logo"
-          className="h-36 p-6 transition-all duration-300 hover:drop-shadow-[0_0_2em_#646cffaa] scale-120"
-        />
-        <img
-          src={reactLogo}
-          alt="React Logo"
-          className="h-36 p-6 transition-all duration-300 hover:drop-shadow-[0_0_2em_#61dafbaa] [animation:spin_20s_linear_infinite]"
-        />
-      </div>
-      <Card>
-        <CardHeader className="gap-4">
-          <CardTitle className="text-3xl font-bold">Bun + React</CardTitle>
-          <CardDescription>
-            Edit <code className="rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono">src/App.tsx</code> and save to
-            test HMR
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <APITester />
-        </CardContent>
-      </Card>
-    </div>
+    <BrowserRouter>
+      <AuthProvider>
+        <ChatCacheProvider>
+          <Routes>
+            <Route path="/login" element={<AuthPage />} />
+            <Route element={<PrivateRoute />}>
+              <Route path="/" element={<MainLayout />}>
+                <Route path="starred" element={<StarredMessages />} />
+                <Route path="channel/:channelId" element={<ChatWindow />} />
+              </Route>
+              <Route path="/profile" element={<ProfilePage />} />
+            </Route>
+          </Routes>
+        </ChatCacheProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
