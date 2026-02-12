@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import { FileIcon, Loader2, Pencil, Trash2, Eye, EyeOff, Reply } from "lucide-react";
+import { FileIcon, Loader2, Pencil, Trash2, Eye, EyeOff, Reply, Star, Hash } from "lucide-react";
 import type { MessageWithReferences, Attachment, MessageWithAttachments } from "@/types";
 import { cn, formatFullTimestamp } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -19,11 +19,14 @@ interface MessageListProps {
   onDeleteMessage?: (id: string) => void;
   onEditMessage?: (id: string, newBody: string) => void;
   onReply?: (message: MessageWithAttachments) => void;
+  onToggleStar?: (id: string, currentStarredAt: string | null) => void;
+  showChannelBadge?: boolean;
+  onChannelClick?: (channelId: string, messageId: string) => void;
+  highlightId?: string | null;
 }
 
+export function MessageList({ channelId, messages, loading, onDeleteMessage, onEditMessage, onReply, onToggleStar, showChannelBadge, onChannelClick, highlightId }: MessageListProps) {
 
-
-export function MessageList({ channelId, messages, loading, onDeleteMessage, onEditMessage, onReply }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -90,6 +93,16 @@ export function MessageList({ channelId, messages, loading, onDeleteMessage, onE
     }
   }, []);
 
+  // Handle highlight scrolling
+  useEffect(() => {
+    if (highlightId && !loading && messages.length > 0) {
+      // Delay slightly to ensure rendering
+      setTimeout(() => {
+        scrollToMessage(highlightId);
+      }, 100);
+    }
+  }, [highlightId, loading, messages.length, scrollToMessage]);
+
   const attachRef = useCallback((id: string, el: HTMLDivElement | null) => {
       if (el) {
           messageRefs.current.set(id, el);
@@ -125,8 +138,11 @@ export function MessageList({ channelId, messages, loading, onDeleteMessage, onE
                 onDelete={onDeleteMessage}
                 onEdit={onEditMessage}
                 onReply={onReply}
+                onToggleStar={onToggleStar}
                 onJumpTo={scrollToMessage}
                 attachRef={attachRef}
+                showChannelBadge={showChannelBadge}
+                onChannelClick={onChannelClick}
             />
         ))}
         <div ref={bottomRef} />
@@ -231,8 +247,11 @@ interface MessageItemProps {
     onDelete?: (id: string) => void;
     onEdit?: (id: string, body: string) => void;
     onReply?: (message: MessageWithAttachments) => void;
+    onToggleStar?: (id: string, currentStarredAt: string | null) => void;
     onJumpTo: (messageId: string) => void;
     attachRef: (id: string, el: HTMLDivElement | null) => void;
+    showChannelBadge?: boolean;
+    onChannelClick?: (channelId: string, messageId: string) => void;
 }
 
 function MessageItem({ 
@@ -240,8 +259,11 @@ function MessageItem({
     onDelete, 
     onEdit,
     onReply,
+    onToggleStar,
     onJumpTo,
-    attachRef
+    attachRef,
+    showChannelBadge,
+    onChannelClick
 }: MessageItemProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editBody, setEditBody] = useState(msg.body || "");
@@ -275,6 +297,16 @@ function MessageItem({
             className="group w-full bg-background rounded-lg shadow-lg border border-border/30 p-6"
         >
             <div className="flex flex-col w-full">
+                {/* Channel Badge (for Starred View) */}
+                {showChannelBadge && (msg as any).channel && (
+                    <button
+                        onClick={() => onChannelClick?.((msg as any).channel.id, msg.id)}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted px-2 py-0.5 rounded-full transition-colors mb-2 w-fit"
+                    >
+                        <Hash className="h-3 w-3" />
+                        <span className="font-medium">{(msg as any).channel.name}</span>
+                    </button>
+                )}
                 
                 {/* References Display (Forward Refs) */}
                 {validReferences.length > 0 && (
@@ -363,6 +395,19 @@ function MessageItem({
                                 onJumpTo={onJumpTo}
                             />
                         )}
+
+                        <button
+                            onClick={() => onToggleStar?.(msg.id, msg.starred_at || null)}
+                            className={cn(
+                                "p-1 rounded transition-colors",
+                                msg.starred_at
+                                    ? "text-yellow-500 hover:text-yellow-600"
+                                    : "text-muted-foreground hover:text-yellow-500"
+                            )}
+                            title={msg.starred_at ? "Unstar" : "Star"}
+                        >
+                            <Star className={cn("h-4 w-4", msg.starred_at && "fill-current")} />
+                        </button>
 
                         <div className="flex gap-1 items-center opacity-0 group-hover:opacity-100 transition-opacity">
                              <button 

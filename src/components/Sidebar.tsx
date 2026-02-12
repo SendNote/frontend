@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, type FormEvent } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
-import { Plus, Hash, LogOut, MoreVertical, Pencil, Trash2, Check, X, User, Settings, Search } from "lucide-react";
+import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
+import { Plus, Hash, LogOut, MoreVertical, Pencil, Trash2, Check, X, User, Settings, Search, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
@@ -141,6 +141,7 @@ function SidebarItem({ channel, isActive, onEdit, onDelete }: SidebarItemProps) 
 export function Sidebar() {
   const { channelId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [newChannelName, setNewChannelName] = useState("");
@@ -324,6 +325,20 @@ export function Sidebar() {
 
       {/* Channel List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {/* Starred Messages Link */}
+        <Link
+            to="/starred"
+            className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-4",
+                location.pathname === "/starred" 
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}
+        >
+            <Star className={cn("h-4 w-4 flex-shrink-0", location.pathname === "/starred" ? "fill-current text-yellow-500" : "text-yellow-500")} />
+            <span className="truncate">Starred</span>
+        </Link>
+
         {isCreating && (
           <form onSubmit={createChannel} className="p-2 mb-2 bg-sidebar-accent/30 rounded-md">
             <Input 

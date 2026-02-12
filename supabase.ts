@@ -174,6 +174,7 @@ export type Database = {
           edited_at: string | null
           fts: unknown
           id: string
+          starred_at: string | null
           updated_at: string
           user_id: string
         }
@@ -185,6 +186,7 @@ export type Database = {
           edited_at?: string | null
           fts?: unknown
           id?: string
+          starred_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -196,6 +198,7 @@ export type Database = {
           edited_at?: string | null
           fts?: unknown
           id?: string
+          starred_at?: string | null
           updated_at?: string
           user_id?: string
         }

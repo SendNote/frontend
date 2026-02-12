@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { MessageList } from "@/components/MessageList";
 import { ChatComposer } from "@/components/ChatComposer";
@@ -12,6 +12,9 @@ type Channel = Database["public"]["Tables"]["channels"]["Row"];
 
 export function ChatWindow() {
   const { channelId } = useParams();
+  const [searchParams] = useSearchParams();
+  const highlightId = searchParams.get('highlight');
+
   const [messages, setMessages] = useState<MessageWithReferences[]>([]);
   const [loading, setLoading] = useState(true);
   const [channel, setChannel] = useState<Channel | null>(null);
@@ -234,6 +237,33 @@ export function ChatWindow() {
     updateCachedMessages(channelId, formatted);
   }
 
+  const handleToggleStar = async (messageId: string, currentStarredAt: string | null) => {
+    const newStarredAt = currentStarredAt ? null : new Date().toISOString();
+    
+    // 1. Optimistic Update - Update local state
+    const updatedMessages = messages.map(m => 
+      m.id === messageId ? { ...m, starred_at: newStarredAt } : m
+    );
+    setMessages(updatedMessages);
+
+    // 2. Update cache
+    if (channelId) {
+      updateCachedMessages(channelId, updatedMessages);
+    }
+
+    // 3. Server Update
+    const { error } = await supabase
+        .from("messages")
+        .update({ starred_at: newStarredAt })
+        .eq("id", messageId);
+    
+    if (error) {
+        console.error("Error toggling star:", error);
+        // Revert on error would be ideal, but for MVP we'll just alert or re-fetch
+        fetchMessages();
+    }
+  };
+
   const handleDeleteMessage = async (id: string) => {
     // 1. Optimistic Update - Update local state
     const updatedMessages = messages.filter(m => m.id !== id);
@@ -293,7 +323,9 @@ export function ChatWindow() {
         loading={loading} 
         onDeleteMessage={handleDeleteMessage}
         onEditMessage={handleEditMessage}
+        onToggleStar={handleToggleStar}
         onReply={handleReply}
+        highlightId={highlightId}
       />
       <ChatComposer 
         channelId={channelId} 

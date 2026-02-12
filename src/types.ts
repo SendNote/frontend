@@ -35,4 +35,11 @@ export interface MessageWithChannel extends MessageWithAttachments {
   };
 }
 
+export interface MessageWithReferencesAndChannel extends MessageWithReferences {
+  channel: {
+    id: string;
+    name: string;
+  };
+}
+
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
